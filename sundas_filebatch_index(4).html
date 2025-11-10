@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Filebatch</title>
+  <link rel="icon" type="image/png" href="sFilebatch logo color.png">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Futura', sans-serif;
+      background-color: #2e2e2e;
+      color: white;
+      overflow: hidden;
+    }
+
+    .top-bar {
+      background: linear-gradient(90deg, #00796b, #00bfa5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      font-size: 22px;
+    }
+
+    .app-title {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-weight: bold;
+    }
+
+    .app-title .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-title img {
+      width: 64px;
+      height: 64px;
+      filter: brightness(0) invert(1);
+    }
+
+    .subtitle {
+      font-size: 14px;
+      font-weight: normal;
+      opacity: 0.8;
+    }
+
+    .button-container {
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    button {
+      background-color: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Futura', sans-serif;
+    }
+
+    button:hover {
+      background-color: rgba(255,255,255,0.35);
+    }
+
+    .file-container {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 12px;
+      padding: 20px;
+      background-color: #3a3a3a;
+      height: calc(100vh - 80px);
+      box-sizing: border-box;
+    }
+
+    .file-item {
+      background-color: #4a4a4a;
+      border-radius: 8px;
+      width: 120px;
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      cursor: move;
+      user-select: none;
+      overflow: hidden;
+      padding: 6px;
+    }
+
+    .file-item img, .file-item video {
+      max-width: 100%;
+      max-height: 80px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    .file-item:hover {
+      background-color: #5a5a5a;
+    }
+
+    .counter {
+      font-size: 14px;
+      color: #ccc;
+    }
+
+    .rename-input {
+      background: transparent;
+      border: none;
+      color: white;
+      text-align: center;
+      font-size: 12px;
+      outline: none;
+      width: 100%;
+    }
+
+    #outputDirInput {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="app-title">
+      <div class="title-row">
+        <img src="sFilebatch logo color.png" alt="Logo">
+        Filebatch
+      </div>
+      <div class="subtitle">Powered by Sundas</div>
+    </div>
+    <div class="button-container">
+      <button id="importBtn">Import Files</button>
+      <button id="setDirBtn">Set Output Directory</button>
+      <button id="exportBtn">Export Files</button>
+      <input type="file" id="outputDirInput" webkitdirectory directory>
+    </div>
+  </div>
+  <div id="fileContainer" class="file-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script>
+    const importBtn = document.getElementById('importBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const setDirBtn = document.getElementById('setDirBtn');
+    const outputDirInput = document.getElementById('outputDirInput');
+    const fileContainer = document.getElementById('fileContainer');
+    let files = [];
+    let outputDirectory = '';
+
+    importBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.onchange = e => {
+        const selectedFiles = Array.from(e.target.files);
+        selectedFiles.forEach(file => {
+          const id = Date.now() + Math.random();
+          files.push({ id, file, name: file.name });
+          const div = document.createElement('div');
+          div.classList.add('file-item');
+          div.dataset.id = id;
+
+          let preview = '';
+          if (file.type.startsWith('image/')) {
+            const imgURL = URL.createObjectURL(file);
+            preview = `<img src="${imgURL}" alt="preview">`;
+          } else if (file.type.startsWith('video/')) {
+            const videoURL = URL.createObjectURL(file);
+            preview = `<video src="${videoURL}" muted></video>`;
+          }
+
+          div.innerHTML = `${preview}<input class='rename-input' value='${file.name}'><div class='counter'></div>`;
+          const inputField = div.querySelector('.rename-input');
+          inputField.addEventListener('change', (ev) => {
+            const target = files.find(f => f.id === id);
+            if (target) target.name = ev.target.value;
+          });
+          fileContainer.appendChild(div);
+        });
+        updateCounters();
+      };
+      input.click();
+    });
+
+    setDirBtn.addEventListener('click', () => {
+      outputDirInput.click();
+    });
+
+    outputDirInput.addEventListener('change', e => {
+      if (e.target.files.length > 0) {
+        outputDirectory = e.target.files[0].webkitRelativePath.split('/')[0];
+        alert(`Output directory set to: ${outputDirectory}`);
+      }
+    });
+
+    exportBtn.addEventListener('click', async () => {
+      const zip = new JSZip();
+      const orderedFiles = Array.from(fileContainer.children).map(div => {
+        const id = parseFloat(div.dataset.id);
+        return files.find(f => f.id === id);
+      });
+      let index = 1;
+      for (const item of orderedFiles) {
+        const arrayBuffer = await item.file.arrayBuffer();
+        const paddedIndex = String(index).padStart(2, '0');
+        const fileName = item.name || item.file.name;
+        const outputPath = outputDirectory ? `${outputDirectory}/` : '';
+        zip.file(`${outputPath}${paddedIndex}_${fileName}`, arrayBuffer);
+        index++;
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, 'Filebatch_export.zip');
+    });
+
+    new Sortable(fileContainer, {
+      animation: 150,
+      onSort: updateCounters
+    });
+
+    function updateCounters() {
+      const items = Array.from(fileContainer.children);
+      items.forEach((item, index) => {
+        const counter = item.querySelector('.counter');
+        counter.textContent = `#${index + 1}`;
+      });
+    }
+  </script>
+</body>
+</html>
